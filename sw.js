@@ -1,4 +1,4 @@
-const CACHE = 'serial-scanner-v1';
+const CACHE = 'serial-scanner-v2';
 const ASSETS = [
   './', './index.html', './css/style.css',
   './js/app.js', './js/serial.js', './js/vote.js', './js/store.js',

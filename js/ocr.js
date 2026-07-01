@@ -10,7 +10,12 @@ export async function createOcr({ whitelist } = {}) {
 
   const worker = await Tesseract.createWorker('eng', 1, {
     workerPath: `${TESS}/worker.min.js`,
-    corePath: `${TESS}/`,          // dir containing tesseract-core-simd.wasm(.js)
+    // Explicit .js file — Tesseract loads it verbatim. A DIRECTORY here makes
+    // Tesseract auto-select a core by SIMD+OEM and, with OEM 1 (lstmOnly), request
+    // tesseract-core-simd-lstm.wasm.js — which we don't vendor → "Failed to load
+    // TesseractCore". The combined SIMD core supports LSTM/OEM 1. (Assumes SIMD,
+    // which every modern iOS/desktop browser has.)
+    corePath: `${TESS}/tesseract-core-simd.wasm.js`,
     langPath: `${TESS}/`,          // dir containing eng.traineddata.gz
     gzip: true,
   });
