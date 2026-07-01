@@ -4,7 +4,7 @@ import { createStore } from './store.js';
 import { createOcr } from './ocr.js';
 import { createCamera } from './camera.js';
 
-const APP_VERSION = 'v6';
+const APP_VERSION = 'v7';
 const LIST_KEY = 'serial-scanner:list';
 const CONFIG_KEY = 'serial-scanner:config';
 const $ = (id) => document.getElementById(id);
@@ -152,8 +152,8 @@ async function startScanner(config) {
     const text = await ocr.recognize(canvas);
     const { valid, serial } = parse(text);
     const locked = voter.push(valid ? serial : null);
-    if (locked) { store.add(locked); render(); setStatus(`Locked ${locked}`); }
-    else if (valid) setStatus(`Aligning… ${serial}`);
+    if (locked) { store.add(locked); render(); setStatus(`Added ${locked}`); }
+    else if (valid) setStatus(`Reading ${serial}… hold steady`);
   };
 
   const camera = createCamera({
