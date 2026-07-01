@@ -19,6 +19,47 @@ let started = false;
 
 function setStatus(msg) { statusEl.textContent = msg; }
 
+// --- Scan band (ROI): user-adjustable, shared live with the camera ---------
+const ROI_KEY = 'serial-scanner:roi';
+const DEFAULT_ROI = { wPct: 0.90, hPct: 0.24 };
+// The camera reads these fractions every frame. Width/height are adjustable via
+// the on-screen sliders; x/y are derived so the band stays centered.
+const roi = { xPct: 0, yPct: 0, wPct: DEFAULT_ROI.wPct, hPct: DEFAULT_ROI.hPct };
+(function initRoi() {
+  try {
+    const s = JSON.parse(localStorage.getItem(ROI_KEY));
+    if (s && typeof s.wPct === 'number' && typeof s.hPct === 'number') {
+      roi.wPct = Math.min(0.96, Math.max(0.40, s.wPct));
+      roi.hPct = Math.min(0.60, Math.max(0.08, s.hPct));
+    }
+  } catch { /* keep defaults */ }
+})();
+
+function applyRoi() {
+  roi.xPct = (1 - roi.wPct) / 2;
+  roi.yPct = (1 - roi.hPct) / 2;
+  const box = $('roi');
+  box.style.left = `${roi.xPct * 100}%`;
+  box.style.top = `${roi.yPct * 100}%`;
+  box.style.width = `${roi.wPct * 100}%`;
+  box.style.height = `${roi.hPct * 100}%`;
+  const w = $('roi-w'), h = $('roi-h');
+  if (w) w.value = String(Math.round(roi.wPct * 100));
+  if (h) h.value = String(Math.round(roi.hPct * 100));
+}
+
+function wireRoi() {
+  const w = $('roi-w'), h = $('roi-h');
+  const onInput = () => {
+    roi.wPct = Number(w.value) / 100;
+    roi.hPct = Number(h.value) / 100;
+    applyRoi();
+    try { localStorage.setItem(ROI_KEY, JSON.stringify({ wPct: roi.wPct, hPct: roi.hPct })); } catch { /* ignore */ }
+  };
+  w.addEventListener('input', onInput);
+  h.addEventListener('input', onInput);
+}
+
 function loadConfig() {
   try { return JSON.parse(localStorage.getItem(CONFIG_KEY)); } catch { return null; }
 }
@@ -117,7 +158,7 @@ async function startScanner(config) {
   const camera = createCamera({
     video: $('video'),
     canvas: $('work'),
-    roi: { xPct: 0.08, yPct: 0.43, wPct: 0.84, hPct: 0.14 }, // matches .roi CSS (slim band)
+    roi, // module-scope, live-adjustable via the W/H sliders
     onFrame,
   });
   window.addEventListener('pagehide', () => camera.stop());
@@ -137,6 +178,8 @@ async function startScanner(config) {
 function main() {
   render();
   wireSetup();
+  wireRoi();
+  applyRoi();
   const config = loadConfig();
   if (!validConfig(config)) { setStatus('Setup required — paste the configuration.'); showSetup(); return; }
   startScanner(config);

@@ -33,6 +33,10 @@ h1 { font-size: 16px; margin: 0; }
   pointer-events: none;
 }
 
+.adjust { display: flex; gap: 16px; align-items: center; padding: 8px 14px 0; flex: none; }
+.adjust label { display: flex; align-items: center; gap: 8px; flex: 1; font-size: 12px; color: #9aa; white-space: nowrap; }
+.adjust input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+
 .controls { display: flex; gap: 12px; padding: 10px 14px; flex: none; }
 .controls button {
   flex: 1; padding: 14px; font-size: 16px; border: 0; border-radius: 8px;
