@@ -1,0 +1,5 @@
+node_modules/
+
+# Real serial format — never commit (kept off the public repo)
+serial-config.local.json
+tests/serial.real.test.js

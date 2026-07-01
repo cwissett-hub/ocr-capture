@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Serial Scanner</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="vendor/tesseract/tesseract.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Serial Scanner</h1>
+    <button id="setup-open" type="button" class="linkbtn">Setup</button>
+    <div id="status" class="status">Starting…</div>
+  </header>
+
+  <section id="setup" class="setup" hidden>
+    <h2>One-time setup</h2>
+    <p>Paste the scanner configuration below, then Save. It is stored only on this device.</p>
+    <textarea id="setup-config" rows="10" spellcheck="false" placeholder="Paste configuration JSON here"></textarea>
+    <div id="setup-error" class="setup-error" role="alert"></div>
+    <button id="setup-save" type="button">Save &amp; start</button>
+  </section>
+
+  <section class="stage">
+    <video id="video" playsinline muted></video>
+    <div id="roi" class="roi"></div>
+    <canvas id="work" hidden></canvas>
+  </section>
+
+  <div class="controls">
+    <button id="capture" type="button">Capture</button>
+    <button id="clear" type="button">Clear all</button>
+  </div>
+
+  <ul id="list" class="list" aria-label="Captured serials"></ul>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
