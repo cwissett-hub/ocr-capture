@@ -37,19 +37,24 @@ export function createCamera({ video, canvas, roi, onFrame, intervalMs = 450 }) 
   function preprocess(context, w, h) {
     const img = context.getImageData(0, 0, w, h);
     const d = img.data;
-    // Grayscale + running mean brightness.
-    let sum = 0;
+    // Grayscale + track brightest/darkest and the mean.
+    let sum = 0, min = 255, max = 0;
     for (let i = 0; i < d.length; i += 4) {
       const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
       d[i] = d[i + 1] = d[i + 2] = g;
       sum += g;
+      if (g < min) min = g;
+      if (g > max) max = g;
     }
     const mean = sum / (d.length / 4);
-    // Dark background (light-on-dark equipment display) -> invert so the text
-    // ends up dark-on-light, which is what the OCR engine expects.
+    // Adaptive threshold at the midpoint of darkest/brightest — robust to dim or
+    // oddly-coloured text (e.g. green-on-black) where a fixed threshold collapses
+    // the text to blank. Invert when the background is dark so the text ends up
+    // dark-on-light, which is what the OCR engine expects.
+    const thr = (min + max) / 2;
     const invert = mean < 110;
     for (let i = 0; i < d.length; i += 4) {
-      let v = d[i] > 140 ? 255 : 0;
+      let v = d[i] > thr ? 255 : 0;
       if (invert) v = 255 - v;
       d[i] = d[i + 1] = d[i + 2] = v;
     }

@@ -14,7 +14,7 @@ const store = createStore({
   load: () => { try { return JSON.parse(localStorage.getItem(LIST_KEY)) || []; } catch { return []; } },
   save: (items) => localStorage.setItem(LIST_KEY, JSON.stringify(items)),
 });
-const voter = createVoter({ needed: 3 });
+const voter = createVoter({ needed: 2, window: 5 });
 let started = false;
 
 function setStatus(msg) { statusEl.textContent = msg; }
@@ -172,7 +172,24 @@ async function startScanner(config) {
   }
 
   $('capture').addEventListener('click', () => camera.capture());
-  $('clear').addEventListener('click', () => { if (confirm('Clear all serials?')) { store.clear(); render(); } });
+
+  // Two-tap clear — avoids the native confirm() dialog, which suspends the page
+  // and stalls the live camera on iOS. First tap arms; second tap within 2.5s clears.
+  let clearArm = false;
+  const clearBtn = $('clear');
+  clearBtn.addEventListener('click', () => {
+    if (!clearArm) {
+      clearArm = true;
+      clearBtn.textContent = 'Tap again to clear';
+      setTimeout(() => { clearArm = false; clearBtn.textContent = 'Clear all'; }, 2500);
+      return;
+    }
+    clearArm = false;
+    clearBtn.textContent = 'Clear all';
+    store.clear();
+    render();
+    setStatus('List cleared.');
+  });
 }
 
 function main() {
