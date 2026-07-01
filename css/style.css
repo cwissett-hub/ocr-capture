@@ -20,6 +20,7 @@ header {
 }
 h1 { font-size: 16px; margin: 0; }
 .status { font-size: 12px; color: #9aa; margin-left: auto; text-align: right; min-height: 15px; }
+.ver { font-size: 11px; color: #667; }
 .linkbtn { background: none; border: 0; color: var(--accent); font-size: 14px; padding: 2px 6px; }
 
 /* Scanner window: fixed height, video fills it (cover), slim guide band with the

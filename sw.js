@@ -1,4 +1,4 @@
-const CACHE = 'serial-scanner-v5';
+const CACHE = 'serial-scanner-v6';
 const ASSETS = [
   './', './index.html', './css/style.css',
   './js/app.js', './js/serial.js', './js/vote.js', './js/store.js',
@@ -20,5 +20,21 @@ self.addEventListener('activate', (e) => {
   );
 });
 self.addEventListener('fetch', (e) => {
-  e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
+  const url = new URL(e.request.url);
+  // Big, static vendored assets: cache-first (fast + offline; they never change).
+  if (url.pathname.includes('/vendor/')) {
+    e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
+    return;
+  }
+  // App shell (html/css/js/manifest/icons): network-first so a new deploy lands
+  // immediately when online; fall back to cache when offline.
+  e.respondWith(
+    fetch(e.request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(e.request))
+  );
 });

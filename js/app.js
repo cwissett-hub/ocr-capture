@@ -4,6 +4,7 @@ import { createStore } from './store.js';
 import { createOcr } from './ocr.js';
 import { createCamera } from './camera.js';
 
+const APP_VERSION = 'v6';
 const LIST_KEY = 'serial-scanner:list';
 const CONFIG_KEY = 'serial-scanner:config';
 const $ = (id) => document.getElementById(id);
@@ -193,6 +194,8 @@ async function startScanner(config) {
 }
 
 function main() {
+  const ver = $('ver');
+  if (ver) ver.textContent = APP_VERSION;
   render();
   wireSetup();
   wireRoi();
