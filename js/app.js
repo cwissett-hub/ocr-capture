@@ -117,7 +117,7 @@ async function startScanner(config) {
   const camera = createCamera({
     video: $('video'),
     canvas: $('work'),
-    roi: { xPct: 0.10, yPct: 0.38, wPct: 0.80, hPct: 0.24 }, // matches .roi CSS
+    roi: { xPct: 0.08, yPct: 0.43, wPct: 0.84, hPct: 0.14 }, // matches .roi CSS (slim band)
     onFrame,
   });
   window.addEventListener('pagehide', () => camera.stop());
