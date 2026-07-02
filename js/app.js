@@ -5,7 +5,7 @@ import { createCamera } from './camera.js';
 import { toCsv } from './csv.js';
 import { createBeeper } from './audio.js';
 
-const APP_VERSION = 'v15';
+const APP_VERSION = 'v16';
 const LIST_KEY = 'serial-scanner:list';
 const CONFIG_KEY = 'serial-scanner:config';
 const ZOOM_KEY = 'serial-scanner:zoom';
