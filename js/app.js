@@ -5,7 +5,7 @@ import { createCamera } from './camera.js';
 import { toCsv } from './csv.js';
 import { createBeeper } from './audio.js';
 
-const APP_VERSION = 'v9';
+const APP_VERSION = 'v10';
 const LIST_KEY = 'serial-scanner:list';
 const CONFIG_KEY = 'serial-scanner:config';
 const $ = (id) => document.getElementById(id);
@@ -162,6 +162,19 @@ function exportCsv() {
   setStatus(`Exported ${items.length} serials.`);
 }
 
+async function copyAll() {
+  const items = store.all();          // newest-first, same order as the list
+  if (!items.length) { setStatus('Nothing to copy.'); return; }
+  const text = items.map((it) => it.serial).join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus(`Copied ${items.length} serials.`);
+  } catch (e) {
+    console.error('Copy all failed', e);
+    setStatus('Copy blocked — use Export CSV instead.');
+  }
+}
+
 function showSetup(prefill) {
   if (prefill) $('setup-config').value = prefill;
   $('setup-error').textContent = '';
@@ -291,6 +304,7 @@ function main() {
   wireRoi();
   applyRoi();
   $('export').addEventListener('click', exportCsv);
+  $('copyall').addEventListener('click', copyAll);
   document.addEventListener('pointerdown', () => beeper.unlock(), { once: true });
   const config = loadConfig();
   if (!validConfig(config)) { setStatus('Setup required — paste the configuration.'); showSetup(); return; }
