@@ -40,25 +40,27 @@ h1 { font-size:16px; font-weight:700; margin:0; }
 #video { width:100%; height:100%; object-fit:cover; display:block; }
 .roi { position:absolute; left:5%; top:38%; width:90%; height:24%;
   border:2px solid var(--accent); border-radius:6px; box-shadow:0 0 0 100vmax rgba(0,0,0,0.5); pointer-events:none; }
-/* Capture tap: a yellow arc chases around the viewfinder border. The ring stays
-   fixed; only the conic-gradient's start angle animates, so the bright arc
-   travels the perimeter (rotating the element itself would just spin the whole
-   rectangle like a bar). */
-@property --roi-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-.roi.scanning::after {
-  content:''; position:absolute; inset:-3px; border-radius:8px; padding:3px; pointer-events:none;
-  background: conic-gradient(from var(--roi-a), transparent 0 68%, var(--accent) 80% 90%, transparent 100%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
-  animation: roi-chase 1.1s linear infinite;
-}
+/* Capture tap: four edge bars light up in sequence so a highlight travels the
+   viewfinder perimeter. Pure opacity animation — no masks/conic/@property, so it
+   renders on WebKit (iPad Safari/Chrome). The bars are invisible unless scanning. */
+.roi .edge { position:absolute; background:var(--accent); box-shadow:0 0 8px 1px var(--accent);
+  opacity:0; pointer-events:none; }
+.roi .edge.t { top:-2px; left:-2px; right:-2px; height:3px; }
+.roi .edge.b { bottom:-2px; left:-2px; right:-2px; height:3px; }
+.roi .edge.l { top:-2px; bottom:-2px; left:-2px; width:3px; }
+.roi .edge.r { top:-2px; bottom:-2px; right:-2px; width:3px; }
+.roi.scanning .edge { animation: edge-chase 1.2s linear infinite; }
+.roi.scanning .edge.t { animation-delay: 0s; }
+.roi.scanning .edge.r { animation-delay: 0.3s; }
+.roi.scanning .edge.b { animation-delay: 0.6s; }
+.roi.scanning .edge.l { animation-delay: 0.9s; }
 /* Successful read: the border pulses green. */
 .roi.success::after {
   content:''; position:absolute; inset:-3px; border-radius:8px; pointer-events:none;
   border:3px solid var(--ok); box-shadow:0 0 16px 2px var(--ok);
   animation: roi-pulse 0.45s ease-out 2;
 }
-@keyframes roi-chase { to { --roi-a: 360deg; } }
+@keyframes edge-chase { 0%,100% { opacity:0.12 } 15% { opacity:1 } 45% { opacity:0.12 } }
 @keyframes roi-pulse { 0%{opacity:1} 50%{opacity:0.2} 100%{opacity:1} }
 #capture { position:absolute; right:16px; bottom:16px; z-index:5;
   width:78px; height:78px; border-radius:50%; border:3px solid rgba(255,255,255,0.9);
