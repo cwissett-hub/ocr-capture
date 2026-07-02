@@ -5,7 +5,7 @@ import { createCamera } from './camera.js';
 import { toCsv } from './csv.js';
 import { createBeeper } from './audio.js';
 
-const APP_VERSION = 'v14';
+const APP_VERSION = 'v15';
 const LIST_KEY = 'serial-scanner:list';
 const CONFIG_KEY = 'serial-scanner:config';
 const ZOOM_KEY = 'serial-scanner:zoom';
@@ -168,6 +168,24 @@ function flashRow(id) {
   setTimeout(() => row.classList.remove('flash'), 500);
 }
 
+// Viewfinder feedback: yellow chasing light on a Capture tap, green pulse on a
+// successful read (mutually exclusive on #roi via classes).
+let roiFxTimer = null;
+function roiScanFx() {
+  const el = $('roi');
+  el.classList.remove('success');
+  el.classList.add('scanning');
+  clearTimeout(roiFxTimer);
+  roiFxTimer = setTimeout(() => el.classList.remove('scanning'), 1200);
+}
+function roiSuccessFx() {
+  const el = $('roi');
+  el.classList.remove('scanning');
+  el.classList.add('success');
+  clearTimeout(roiFxTimer);
+  roiFxTimer = setTimeout(() => el.classList.remove('success'), 900);
+}
+
 async function copy(serial, li) {
   try {
     await navigator.clipboard.writeText(serial);
@@ -293,6 +311,7 @@ async function startScanner(config) {
     const item = store.add(serial, Date.now());
     render();
     flashRow(item.id);
+    roiSuccessFx();
     beeper.beep(item.dup ? 'dup' : 'new');
     setStatus(`Added ${serial}`);
   };
@@ -315,7 +334,7 @@ async function startScanner(config) {
     setStatus('Camera unavailable. Enable camera in iOS Settings › Safari, or use Capture.');
   }
 
-  $('capture').addEventListener('click', () => { beeper.unlock(); camera.capture(); });
+  $('capture').addEventListener('click', () => { beeper.unlock(); roiScanFx(); camera.capture(); });
 
   let clearArm = false;
   const clearBtn = $('clear');
