@@ -1,8 +1,8 @@
-const CACHE = 'serial-scanner-v10';
+const CACHE = 'serial-scanner-v11';
 const ASSETS = [
   './', './index.html', './css/style.css',
   './js/app.js', './js/serial.js', './js/vote.js', './js/store.js',
-  './js/ocr.js', './js/camera.js',
+  './js/ocr.js', './js/camera.js', './js/zoom.js',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png',
   './vendor/tesseract/tesseract.min.js', './vendor/tesseract/worker.min.js',
   './vendor/tesseract/tesseract-core-simd.wasm.js',

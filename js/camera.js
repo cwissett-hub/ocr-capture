@@ -1,28 +1,34 @@
+import { zoomedRegion } from './zoom.js';
+
+function zoomCapsFor(track) {
+  try {
+    const c = track && track.getCapabilities ? track.getCapabilities() : null;
+    if (c && c.zoom && typeof c.zoom.max === 'number') {
+      return { supported: true, native: true, max: Math.min(c.zoom.max, 5) };
+    }
+  } catch (e) { /* ignore */ }
+  return { supported: true, native: false, max: 4 };
+}
+
 export function createCamera({ video, canvas, roi, onFrame, intervalMs = 450 }) {
   let stream = null;
   let timer = null;
   let busy = false;
+  let digitalZoom = 1;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
   async function tick() {
     if (busy || !video.videoWidth || !video.clientWidth) return;
     busy = true;
     try {
-      // The video is shown with object-fit: cover, so the element crops the
-      // frame. Map the on-screen ROI (fractions of the DISPLAYED video box) back
-      // to source-frame pixels, so the region we OCR is exactly the guide box.
+      // object-fit: cover — map the on-screen ROI back to source-frame pixels.
       const vw = video.videoWidth, vh = video.videoHeight;
       const bw = video.clientWidth, bh = video.clientHeight;
-      const scale = Math.max(bw / vw, bh / vh);   // object-fit: cover
-      const visW = bw / scale, visH = bh / scale;  // source px visible in the box
+      const scale = Math.max(bw / vw, bh / vh);
+      const visW = bw / scale, visH = bh / scale;
       const offX = (vw - visW) / 2, offY = (vh - visH) / 2;
-      const sx = offX + roi.xPct * visW;
-      const sy = offY + roi.yPct * visH;
-      const sw = roi.wPct * visW;
-      const sh = roi.hPct * visH;
+      const { sx, sy, sw, sh } = zoomedRegion(roi, visW, visH, offX, offY, digitalZoom);
 
-      // Draw the crop at a fixed OCR-friendly width so recognition is consistent
-      // regardless of the (now high-res) source frame.
       const targetW = 1024;
       canvas.width = targetW;
       canvas.height = Math.max(1, Math.round(targetW * sh / sw));
@@ -37,7 +43,6 @@ export function createCamera({ video, canvas, roi, onFrame, intervalMs = 450 }) 
   function preprocess(context, w, h) {
     const img = context.getImageData(0, 0, w, h);
     const d = img.data;
-    // Grayscale + track brightest/darkest and the mean.
     let sum = 0, min = 255, max = 0;
     for (let i = 0; i < d.length; i += 4) {
       const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
@@ -47,10 +52,6 @@ export function createCamera({ video, canvas, roi, onFrame, intervalMs = 450 }) 
       if (g > max) max = g;
     }
     const mean = sum / (d.length / 4);
-    // Adaptive threshold at the midpoint of darkest/brightest — robust to dim or
-    // oddly-coloured text (e.g. green-on-black) where a fixed threshold collapses
-    // the text to blank. Invert when the background is dark so the text ends up
-    // dark-on-light, which is what the OCR engine expects.
     const thr = (min + max) / 2;
     const invert = mean < 110;
     for (let i = 0; i < d.length; i += 4) {
@@ -64,8 +65,6 @@ export function createCamera({ video, canvas, roi, onFrame, intervalMs = 450 }) 
   return {
     async start() {
       stream = await navigator.mediaDevices.getUserMedia({
-        // Ask for a high-res rear stream so small serials stay legible after the
-        // ROI crop. The browser clamps to the nearest supported mode.
         video: {
           facingMode: { ideal: 'environment' },
           width: { ideal: 2560 },
@@ -75,12 +74,11 @@ export function createCamera({ video, canvas, roi, onFrame, intervalMs = 450 }) 
       });
       video.srcObject = stream;
       await video.play();
-      // Best-effort continuous autofocus (ignored where unsupported).
       const track = stream.getVideoTracks()[0];
       try {
         await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
       } catch (e) {
-        /* focusMode not supported on this device — hardware AF still applies */
+        /* focusMode not supported — hardware AF still applies */
       }
       timer = setInterval(tick, intervalMs);
     },
@@ -90,5 +88,21 @@ export function createCamera({ video, canvas, roi, onFrame, intervalMs = 450 }) 
     },
     capture() { return tick(); },
     track() { return stream ? stream.getVideoTracks()[0] : null; },
+    zoomCaps() { return zoomCapsFor(stream ? stream.getVideoTracks()[0] : null); },
+    async setZoom(z) {
+      const t = stream ? stream.getVideoTracks()[0] : null;
+      const caps = zoomCapsFor(t);
+      const zz = Math.max(1, Math.min(z, caps.max));
+      if (t && caps.native) {
+        try {
+          await t.applyConstraints({ advanced: [{ zoom: zz }] });
+          digitalZoom = 1;
+          video.style.transform = '';
+          return;
+        } catch (e) { /* fall through to digital */ }
+      }
+      digitalZoom = zz;
+      video.style.transform = zz > 1 ? `scale(${zz})` : '';
+    },
   };
 }

@@ -5,9 +5,10 @@ import { createCamera } from './camera.js';
 import { toCsv } from './csv.js';
 import { createBeeper } from './audio.js';
 
-const APP_VERSION = 'v10';
+const APP_VERSION = 'v11';
 const LIST_KEY = 'serial-scanner:list';
 const CONFIG_KEY = 'serial-scanner:config';
+const ZOOM_KEY = 'serial-scanner:zoom';
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
 const listEl = $('list');
@@ -36,6 +37,42 @@ const roi = { xPct: 0, yPct: 0, wPct: DEFAULT_ROI.wPct, hPct: DEFAULT_ROI.hPct }
     }
   } catch { /* keep defaults */ }
 })();
+
+let zoom = 1;
+let zoomMax = 4;
+(function initZoom() {
+  try { const z = parseFloat(localStorage.getItem(ZOOM_KEY)); if (z >= 1) zoom = z; } catch { /* default */ }
+})();
+
+function setupZoom(camera) {
+  const caps = camera.zoomCaps();
+  zoomMax = caps.max;
+  const toggle = $('zoom-toggle');
+  const panel = $('zoom-panel');
+  const levelEl = $('zoom-level');
+  panel.querySelectorAll('.preset').forEach((b) => { if (Number(b.dataset.z) > zoomMax) b.hidden = true; });
+
+  const apply = (z) => {
+    zoom = Math.max(1, Math.min(z, zoomMax));
+    camera.setZoom(zoom);
+    try { localStorage.setItem(ZOOM_KEY, String(zoom)); } catch { /* ignore */ }
+    levelEl.textContent = `${zoom.toFixed(1)}×`;
+    panel.querySelectorAll('.preset').forEach((b) => b.classList.toggle('active', Number(b.dataset.z) === zoom));
+  };
+
+  toggle.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    toggle.classList.toggle('on', !panel.hidden);
+  });
+  panel.querySelectorAll('.zbtn').forEach((b) => b.addEventListener('click', () => {
+    const d = b.dataset.z;
+    if (d === 'inc') apply(zoom + 0.5);
+    else if (d === 'dec') apply(zoom - 0.5);
+    else apply(Number(d));
+  }));
+  apply(zoom); // apply persisted level (clamped to this device's max) on start
+}
+
 function applyRoi() {
   roi.xPct = (1 - roi.wPct) / 2;
   roi.yPct = (1 - roi.hPct) / 2;
@@ -272,6 +309,7 @@ async function startScanner(config) {
     acquireWakeLock();
     setupTorch(camera);
     setupTapToFocus(camera);
+    setupZoom(camera);
   } catch (e) {
     console.error('Camera start failed', e);
     setStatus('Camera unavailable. Enable camera in iOS Settings › Safari, or use Capture.');
