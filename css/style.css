@@ -24,7 +24,8 @@
 html, body { height:100%; }
 body { margin:0; height:100dvh; display:flex; flex-direction:column; overflow:hidden;
   background:var(--bg); color:var(--text);
-  font:15px/1.5 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif; }
+  font:15px/1.5 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  touch-action: manipulation; } /* disable iOS double-tap-to-zoom (still scrolls) */
 
 .snap-stripe { height:4px; background:#fffc00; flex:none; }
 
