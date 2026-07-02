@@ -5,7 +5,7 @@ import { createCamera } from './camera.js';
 import { toCsv } from './csv.js';
 import { createBeeper } from './audio.js';
 
-const APP_VERSION = 'v17';
+const APP_VERSION = 'v18';
 const LIST_KEY = 'serial-scanner:list';
 const CONFIG_KEY = 'serial-scanner:config';
 const ZOOM_KEY = 'serial-scanner:zoom';
@@ -20,6 +20,7 @@ const store = createStore({
 const beeper = createBeeper();
 let started = false;
 let armed = false;     // press Capture to arm; records one serial then disarms
+let armedAt = 0;       // timestamp of the arming press (for min chaser visibility)
 let parse = null;      // bound to the config when the scanner starts
 let editingId = null;  // row being edited, or null
 
@@ -303,13 +304,16 @@ async function startScanner(config) {
     const { valid, serial } = parse(text);
     if (!valid) return;
     armed = false;
-    $('roi').classList.remove('scanning');
     const item = store.add(serial, Date.now());
     render();
     flashRow(item.id);
-    roiSuccessFx();
     beeper.beep(item.dup ? 'dup' : 'new');
     setStatus(`Added ${serial}`);
+    // Keep the chaser visible for a beat even on an instant capture, then swap
+    // to the green success pulse (otherwise a fast read hides the chaser).
+    const el = $('roi');
+    const wait = Math.max(0, 600 - (Date.now() - armedAt));
+    setTimeout(() => { el.classList.remove('scanning'); roiSuccessFx(); }, wait);
   };
 
   const camera = createCamera({ video: $('video'), canvas: $('work'), roi, onFrame });
@@ -337,6 +341,7 @@ async function startScanner(config) {
     el.classList.remove('success');
     if (armed) {
       el.classList.add('scanning');       // chaser = armed / hunting for one serial
+      armedAt = Date.now();
       setStatus('Point at a serial…');
       camera.capture();                   // grab immediately if one is already in view
     } else {
