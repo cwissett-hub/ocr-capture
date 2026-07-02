@@ -5,7 +5,7 @@ import { createCamera } from './camera.js';
 import { toCsv } from './csv.js';
 import { createBeeper } from './audio.js';
 
-const APP_VERSION = 'v16';
+const APP_VERSION = 'v17';
 const LIST_KEY = 'serial-scanner:list';
 const CONFIG_KEY = 'serial-scanner:config';
 const ZOOM_KEY = 'serial-scanner:zoom';
@@ -19,6 +19,7 @@ const store = createStore({
 });
 const beeper = createBeeper();
 let started = false;
+let armed = false;     // press Capture to arm; records one serial then disarms
 let parse = null;      // bound to the config when the scanner starts
 let editingId = null;  // row being edited, or null
 
@@ -171,13 +172,6 @@ function flashRow(id) {
 // Viewfinder feedback: yellow chasing light on a Capture tap, green pulse on a
 // successful read (mutually exclusive on #roi via classes).
 let roiFxTimer = null;
-function roiScanFx() {
-  const el = $('roi');
-  el.classList.remove('success');
-  el.classList.add('scanning');
-  clearTimeout(roiFxTimer);
-  roiFxTimer = setTimeout(() => el.classList.remove('scanning'), 1200);
-}
 function roiSuccessFx() {
   const el = $('roi');
   el.classList.remove('scanning');
@@ -301,13 +295,15 @@ async function startScanner(config) {
     return;
   }
 
-  let held = null;
+  // Press-to-capture-one: OCR only runs while armed. On a valid read we record
+  // exactly one serial then disarm and wait for the next Capture press.
   const onFrame = async (canvas) => {
+    if (!armed) return;
     const text = await ocr.recognize(canvas);
     const { valid, serial } = parse(text);
-    if (!valid) { held = null; return; }
-    if (serial === held) { setStatus(`Added ${serial}`); return; }
-    held = serial;
+    if (!valid) return;
+    armed = false;
+    $('roi').classList.remove('scanning');
     const item = store.add(serial, Date.now());
     render();
     flashRow(item.id);
@@ -324,7 +320,7 @@ async function startScanner(config) {
 
   try {
     await camera.start();
-    setStatus('Point the box at a serial.');
+    setStatus('Press Capture to scan a serial.');
     acquireWakeLock();
     setupTorch(camera);
     setupTapToFocus(camera);
@@ -334,7 +330,20 @@ async function startScanner(config) {
     setStatus('Camera unavailable. Enable camera in iOS Settings › Safari, or use Capture.');
   }
 
-  $('capture').addEventListener('click', () => { beeper.unlock(); roiScanFx(); camera.capture(); });
+  $('capture').addEventListener('click', () => {
+    beeper.unlock();
+    armed = !armed;
+    const el = $('roi');
+    el.classList.remove('success');
+    if (armed) {
+      el.classList.add('scanning');       // chaser = armed / hunting for one serial
+      setStatus('Point at a serial…');
+      camera.capture();                   // grab immediately if one is already in view
+    } else {
+      el.classList.remove('scanning');
+      setStatus('Paused — press Capture to scan.');
+    }
+  });
 
   let clearArm = false;
   const clearBtn = $('clear');
