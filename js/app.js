@@ -2,8 +2,10 @@ import { createParser } from './serial.js';
 import { createStore } from './store.js';
 import { createOcr } from './ocr.js';
 import { createCamera } from './camera.js';
+import { toCsv } from './csv.js';
+import { createBeeper } from './audio.js';
 
-const APP_VERSION = 'v8';
+const APP_VERSION = 'v9';
 const LIST_KEY = 'serial-scanner:list';
 const CONFIG_KEY = 'serial-scanner:config';
 const $ = (id) => document.getElementById(id);
@@ -14,15 +16,16 @@ const store = createStore({
   load: () => { try { return JSON.parse(localStorage.getItem(LIST_KEY)) || []; } catch { return []; } },
   save: (items) => localStorage.setItem(LIST_KEY, JSON.stringify(items)),
 });
+const beeper = createBeeper();
 let started = false;
+let parse = null;      // bound to the config when the scanner starts
+let editingId = null;  // row being edited, or null
 
 function setStatus(msg) { statusEl.textContent = msg; }
 
 // --- Scan band (ROI): user-adjustable, shared live with the camera ---------
 const ROI_KEY = 'serial-scanner:roi';
 const DEFAULT_ROI = { wPct: 0.90, hPct: 0.24 };
-// The camera reads these fractions every frame. Width/height are adjustable via
-// the on-screen sliders; x/y are derived so the band stays centered.
 const roi = { xPct: 0, yPct: 0, wPct: DEFAULT_ROI.wPct, hPct: DEFAULT_ROI.hPct };
 (function initRoi() {
   try {
@@ -33,7 +36,6 @@ const roi = { xPct: 0, yPct: 0, wPct: DEFAULT_ROI.wPct, hPct: DEFAULT_ROI.hPct }
     }
   } catch { /* keep defaults */ }
 })();
-
 function applyRoi() {
   roi.xPct = (1 - roi.wPct) / 2;
   roi.yPct = (1 - roi.hPct) / 2;
@@ -46,7 +48,6 @@ function applyRoi() {
   if (w) w.value = String(Math.round(roi.wPct * 100));
   if (h) h.value = String(Math.round(roi.hPct * 100));
 }
-
 function wireRoi() {
   const w = $('roi-w'), h = $('roi-h');
   const onInput = () => {
@@ -59,9 +60,7 @@ function wireRoi() {
   h.addEventListener('input', onInput);
 }
 
-function loadConfig() {
-  try { return JSON.parse(localStorage.getItem(CONFIG_KEY)); } catch { return null; }
-}
+function loadConfig() { try { return JSON.parse(localStorage.getItem(CONFIG_KEY)); } catch { return null; } }
 function validConfig(c) {
   return !!c && typeof c === 'object'
     && Number.isInteger(c.length)
@@ -74,20 +73,62 @@ function render() {
   listEl.replaceChildren();
   for (const it of store.all()) {
     const li = document.createElement('li');
-    li.className = it.dup ? 'dup' : '';
     li.dataset.id = it.id;
+    if (it.id === editingId) {
+      li.className = 'editing';
+      const input = document.createElement('input');
+      input.className = 'edit-input';
+      input.value = it.serial;
+      input.setAttribute('spellcheck', 'false');
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') commitEdit(it.id, input.value);
+        else if (e.key === 'Escape') { editingId = null; render(); }
+      });
+      const ok = document.createElement('button');
+      ok.className = 'ok'; ok.textContent = '✓'; ok.setAttribute('aria-label', 'Save');
+      ok.addEventListener('click', () => commitEdit(it.id, input.value));
+      const cancel = document.createElement('button');
+      cancel.className = 'del'; cancel.textContent = '×'; cancel.setAttribute('aria-label', 'Cancel');
+      cancel.addEventListener('click', () => { editingId = null; render(); });
+      li.append(input, ok, cancel);
+      listEl.appendChild(li);
+      input.focus();
+      continue;
+    }
+    li.className = it.dup ? 'dup' : '';
     const span = document.createElement('span');
     span.className = 'serial';
     span.textContent = it.serial;
     span.addEventListener('click', () => copy(it.serial, li));
+    const edit = document.createElement('button');
+    edit.className = 'edit'; edit.textContent = '✎'; edit.setAttribute('aria-label', 'Edit');
+    edit.addEventListener('click', () => { editingId = it.id; render(); });
     const del = document.createElement('button');
-    del.className = 'del';
-    del.textContent = '×';
-    del.setAttribute('aria-label', 'Delete');
+    del.className = 'del'; del.textContent = '×'; del.setAttribute('aria-label', 'Delete');
     del.addEventListener('click', () => { store.remove(it.id); render(); });
-    li.append(span, del);
+    li.append(span, edit, del);
     listEl.appendChild(li);
   }
+  const c = $('count');
+  if (c) c.textContent = `${listEl.children.length} captured`;
+}
+
+function commitEdit(id, value) {
+  if (!parse) { setStatus('Cannot edit before setup.'); return; }
+  const { valid, serial } = parse(value);
+  if (!valid) { setStatus('Invalid format — not saved.'); return; }
+  store.update(id, serial);
+  editingId = null;
+  render();
+  setStatus(`Edited to ${serial}`);
+}
+
+function flashRow(id) {
+  const row = listEl.querySelector(`li[data-id="${id}"]`);
+  if (!row) return;
+  row.classList.add('flash');
+  row.scrollIntoView({ block: 'nearest' });
+  setTimeout(() => row.classList.remove('flash'), 500);
 }
 
 async function copy(serial, li) {
@@ -106,17 +147,29 @@ async function copy(serial, li) {
   setTimeout(() => li.classList.remove('copied'), 600);
 }
 
+function exportCsv() {
+  const items = store.all();
+  if (!items.length) { setStatus('Nothing to export.'); return; }
+  const blob = new Blob([toCsv(items)], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `serials-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setStatus(`Exported ${items.length} serials.`);
+}
+
 function showSetup(prefill) {
   if (prefill) $('setup-config').value = prefill;
   $('setup-error').textContent = '';
   $('setup').hidden = false;
 }
 function hideSetup() { $('setup').hidden = true; }
-
 function wireSetup() {
-  $('setup-open').addEventListener('click', () => {
-    showSetup(localStorage.getItem(CONFIG_KEY) || '');
-  });
+  $('setup-open').addEventListener('click', () => showSetup(localStorage.getItem(CONFIG_KEY) || ''));
   $('setup-save').addEventListener('click', () => {
     let cfg;
     try { cfg = JSON.parse($('setup-config').value); }
@@ -131,10 +184,44 @@ function wireSetup() {
   });
 }
 
+// --- keep-awake ------------------------------------------------------------
+let wakeLock = null;
+async function acquireWakeLock() {
+  try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); }
+  catch (e) { /* unsupported or denied */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && started) acquireWakeLock();
+});
+
+function setupTorch(camera) {
+  const track = camera.track();
+  const btn = $('torch');
+  let caps = null;
+  try { caps = track && track.getCapabilities ? track.getCapabilities() : null; } catch { caps = null; }
+  if (!track || !caps || !('torch' in caps)) return; // unsupported: stays hidden
+  btn.hidden = false;
+  let on = false;
+  btn.addEventListener('click', async () => {
+    on = !on;
+    try { await track.applyConstraints({ advanced: [{ torch: on }] }); btn.classList.toggle('on', on); }
+    catch (e) { console.error('Torch failed', e); }
+  });
+}
+
+function setupTapToFocus(camera) {
+  $('video').addEventListener('click', async () => {
+    const track = camera.track();
+    if (!track || !track.applyConstraints) return;
+    try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); }
+    catch (e) { /* unsupported */ }
+  });
+}
+
 async function startScanner(config) {
-  if (started) return;   // camera/OCR already running from a prior config
+  if (started) return;
   started = true;
-  const parse = createParser(config);
+  parse = createParser(config);
 
   let ocr;
   try {
@@ -146,10 +233,6 @@ async function startScanner(config) {
     return;
   }
 
-  // Lock on the first valid read — a read already passed the strict format
-  // regex, so one clean frame is enough. `held` stops the same serial being
-  // re-added every frame while it stays in view; a blank/invalid frame clears it
-  // so the same part can be scanned again by looking away and back.
   let held = null;
   const onFrame = async (canvas) => {
     const text = await ocr.recognize(canvas);
@@ -157,31 +240,32 @@ async function startScanner(config) {
     if (!valid) { held = null; return; }
     if (serial === held) { setStatus(`Added ${serial}`); return; }
     held = serial;
-    store.add(serial);
+    const item = store.add(serial, Date.now());
     render();
+    flashRow(item.id);
+    beeper.beep(item.dup ? 'dup' : 'new');
     setStatus(`Added ${serial}`);
   };
 
-  const camera = createCamera({
-    video: $('video'),
-    canvas: $('work'),
-    roi, // module-scope, live-adjustable via the W/H sliders
-    onFrame,
+  const camera = createCamera({ video: $('video'), canvas: $('work'), roi, onFrame });
+  window.addEventListener('pagehide', () => {
+    camera.stop();
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   });
-  window.addEventListener('pagehide', () => camera.stop());
 
   try {
     await camera.start();
     setStatus('Point the box at a serial.');
+    acquireWakeLock();
+    setupTorch(camera);
+    setupTapToFocus(camera);
   } catch (e) {
     console.error('Camera start failed', e);
     setStatus('Camera unavailable. Enable camera in iOS Settings › Safari, or use Capture.');
   }
 
-  $('capture').addEventListener('click', () => camera.capture());
+  $('capture').addEventListener('click', () => { beeper.unlock(); camera.capture(); });
 
-  // Two-tap clear — avoids the native confirm() dialog, which suspends the page
-  // and stalls the live camera on iOS. First tap arms; second tap within 2.5s clears.
   let clearArm = false;
   const clearBtn = $('clear');
   clearBtn.addEventListener('click', () => {
@@ -206,6 +290,8 @@ function main() {
   wireSetup();
   wireRoi();
   applyRoi();
+  $('export').addEventListener('click', exportCsv);
+  document.addEventListener('pointerdown', () => beeper.unlock(), { once: true });
   const config = loadConfig();
   if (!validConfig(config)) { setStatus('Setup required — paste the configuration.'); showSetup(); return; }
   startScanner(config);

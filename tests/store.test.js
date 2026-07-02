@@ -42,3 +42,29 @@ test('persists via save after each mutation and hydrates from load', () => {
   const next = s2.add('SERIAL-BBB'); // id must not collide with hydrated item
   assert.notEqual(next.id, s2.all()[1].id);
 });
+
+test('add records a timestamp and it round-trips through save/load', () => {
+  let saved = [];
+  const s1 = createStore({ load: () => [], save: (x) => { saved = x; } });
+  const it = s1.add('SERIAL-AAA', 1700000000000);
+  assert.equal(it.ts, 1700000000000);
+  const s2 = createStore({ load: () => saved.map((i) => ({ ...i })) });
+  assert.equal(s2.all()[0].ts, 1700000000000);
+});
+
+test('add without a timestamp stores ts null', () => {
+  const s = createStore();
+  assert.equal(s.add('SERIAL-AAA').ts, null);
+});
+
+test('update changes the serial and recomputes dup', () => {
+  const s = createStore();
+  const a = s.add('SERIAL-AAA');
+  s.add('SERIAL-BBB');
+  s.update(a.id, 'SERIAL-BBB');            // now collides with the other row
+  const updated = s.all().find((it) => it.id === a.id);
+  assert.equal(updated.serial, 'SERIAL-BBB');
+  assert.equal(updated.dup, true);
+  s.update(a.id, 'SERIAL-ZZZ');            // now unique again
+  assert.equal(s.all().find((it) => it.id === a.id).dup, false);
+});

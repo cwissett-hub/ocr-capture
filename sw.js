@@ -1,4 +1,4 @@
-const CACHE = 'serial-scanner-v8';
+const CACHE = 'serial-scanner-v9';
 const ASSETS = [
   './', './index.html', './css/style.css',
   './js/app.js', './js/serial.js', './js/vote.js', './js/store.js',
@@ -8,6 +8,8 @@ const ASSETS = [
   './vendor/tesseract/tesseract-core-simd.wasm.js',
   './vendor/tesseract/tesseract-core-simd.wasm',
   './vendor/tesseract/eng.traineddata.gz',
+  './vendor/fonts/space-grotesk-400.woff2', './vendor/fonts/space-grotesk-500.woff2',
+  './vendor/fonts/space-grotesk-700.woff2', './vendor/fonts/jetbrains-mono-500.woff2',
 ];
 
 self.addEventListener('install', (e) => {

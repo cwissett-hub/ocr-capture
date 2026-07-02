@@ -89,5 +89,6 @@ export function createCamera({ video, canvas, roi, onFrame, intervalMs = 450 }) 
       if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
     },
     capture() { return tick(); },
+    track() { return stream ? stream.getVideoTracks()[0] : null; },
   };
 }

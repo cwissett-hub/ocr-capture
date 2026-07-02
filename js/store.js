@@ -5,20 +5,20 @@ export function createStore({ load = () => [], save = () => {} } = {}) {
 
   return {
     all() { return items.map((it) => ({ ...it })); },
-    add(serial) {
+    add(serial, ts = null) {
       const dup = items.some((it) => it.serial === serial);
-      const item = { id: nextId++, serial, dup };
+      const item = { id: nextId++, serial, dup, ts };
       items = [item, ...items];
       persist();
       return { ...item };
     },
-    remove(id) {
-      items = items.filter((it) => it.id !== id);
+    update(id, serial) {
+      items = items.map((it) => it.id === id
+        ? { ...it, serial, dup: items.some((o) => o.id !== id && o.serial === serial) }
+        : it);
       persist();
     },
-    clear() {
-      items = [];
-      persist();
-    },
+    remove(id) { items = items.filter((it) => it.id !== id); persist(); },
+    clear() { items = []; persist(); },
   };
 }
