@@ -82,10 +82,12 @@ h1 { font-size:16px; font-weight:700; margin:0; }
 .zoombtn { position: absolute; right: 16px; top: 16px; z-index: 5; width: 52px; height: 52px;
   border-radius: 50%; border: 2px solid var(--border); background: var(--panel-2); color: var(--text); font-size: 20px; }
 .zoombtn.on { background: var(--accent); color: #000; border-color: var(--accent); }
-.zoom-panel { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 6;
-  display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+/* Vertical stack on the right, above the Capture shutter (78px + 16px margin). */
+.zoom-panel { position: absolute; right: 16px; bottom: 104px; z-index: 6;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px;
   background: rgba(17,17,17,0.92); border: 1px solid var(--border); border-radius: var(--r-btn); }
-.zoom-panel .zbtn { min-width: 40px; height: 40px; border: 0; border-radius: 6px;
+.zoom-panel[hidden] { display: none; } /* author rule must re-assert what [hidden] would do; a bare .zoom-panel{display:flex} overrides the UA hidden rule */
+.zoom-panel .zbtn { width: 44px; height: 40px; border: 0; border-radius: 6px;
   background: var(--panel-2); color: var(--text); font-size: 15px; font-weight: 600; }
 .zoom-panel .zbtn.preset.active { background: var(--accent); color: #000; }
 .zoom-level { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent-fg);
