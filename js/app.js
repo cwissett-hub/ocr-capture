@@ -1,10 +1,9 @@
 import { createParser } from './serial.js';
-import { createVoter } from './vote.js';
 import { createStore } from './store.js';
 import { createOcr } from './ocr.js';
 import { createCamera } from './camera.js';
 
-const APP_VERSION = 'v7';
+const APP_VERSION = 'v8';
 const LIST_KEY = 'serial-scanner:list';
 const CONFIG_KEY = 'serial-scanner:config';
 const $ = (id) => document.getElementById(id);
@@ -15,7 +14,6 @@ const store = createStore({
   load: () => { try { return JSON.parse(localStorage.getItem(LIST_KEY)) || []; } catch { return []; } },
   save: (items) => localStorage.setItem(LIST_KEY, JSON.stringify(items)),
 });
-const voter = createVoter({ needed: 2, window: 5 });
 let started = false;
 
 function setStatus(msg) { statusEl.textContent = msg; }
@@ -148,12 +146,20 @@ async function startScanner(config) {
     return;
   }
 
+  // Lock on the first valid read — a read already passed the strict format
+  // regex, so one clean frame is enough. `held` stops the same serial being
+  // re-added every frame while it stays in view; a blank/invalid frame clears it
+  // so the same part can be scanned again by looking away and back.
+  let held = null;
   const onFrame = async (canvas) => {
     const text = await ocr.recognize(canvas);
     const { valid, serial } = parse(text);
-    const locked = voter.push(valid ? serial : null);
-    if (locked) { store.add(locked); render(); setStatus(`Added ${locked}`); }
-    else if (valid) setStatus(`Reading ${serial}… hold steady`);
+    if (!valid) { held = null; return; }
+    if (serial === held) { setStatus(`Added ${serial}`); return; }
+    held = serial;
+    store.add(serial);
+    render();
+    setStatus(`Added ${serial}`);
   };
 
   const camera = createCamera({
