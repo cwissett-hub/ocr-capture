@@ -80,7 +80,7 @@ h1 { font-size:16px; font-weight:700; margin:0; }
 .setup button { margin-top:6px; padding:12px 18px; font-size:16px; font-weight:500; border:0; border-radius:var(--r-btn); background:var(--accent); color:#000; }
 
 #video { transform-origin: center center; }
-.zoombtn { position: absolute; right: 16px; top: 16px; z-index: 5; width: 52px; height: 52px;
+.zoombtn { position: absolute; right: 104px; bottom: 29px; z-index: 5; width: 52px; height: 52px;
   border-radius: 50%; border: 2px solid var(--border); background: var(--panel-2); color: var(--text); font-size: 20px; }
 .zoombtn.on { background: var(--accent); color: #000; border-color: var(--accent); }
 /* Vertical stack on the right, above the Capture shutter (78px + 16px margin). */
